@@ -1,0 +1,160 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kipu Wallet API (MVP)",
+    "version": "0.1.0",
+    "description": "API propia del BFF. HU-01 onboarding, HU-02 pago a un contacto, HU-04 idempotencia. Dinero ficticio. Los importes viajan como cadenas decimales exactas en PEN. Sesion de servidor por cookie HttpOnly; las escrituras exigen el encabezado X-XSRF-TOKEN con el valor de la cookie XSRF-TOKEN."
+  },
+  "servers": [{ "url": "/" }],
+  "tags": [
+    { "name": "auth" }, { "name": "onboarding" }, { "name": "contacts" }, { "name": "wallet" }, { "name": "payments" }
+  ],
+  "paths": {
+    "/api/onboarding/register": {
+      "post": {
+        "tags": ["onboarding"], "summary": "Paso 1: crea la cuenta e inicia la sesion",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
+        "responses": {
+          "201": { "description": "Cuenta creada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Onboarding" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/onboarding": {
+      "get": {
+        "tags": ["onboarding"], "summary": "Estado del onboarding: pasos y paso actual",
+        "responses": { "200": { "description": "Estado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Onboarding" } } } }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/onboarding/personal-data": {
+      "post": {
+        "tags": ["onboarding"], "summary": "Paso 2: datos personales",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PersonalDataRequest" } } } },
+        "responses": { "200": { "description": "Paso completado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Onboarding" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/onboarding/phone/code": {
+      "post": {
+        "tags": ["onboarding"], "summary": "Paso 3a: solicita el codigo de verificacion del celular",
+        "description": "No hay proveedor SMS: demoCode solo se devuelve cuando el modo demo esta activo.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PhoneRequest" } } } },
+        "responses": { "200": { "description": "Codigo emitido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PhoneCode" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/onboarding/phone/verify": {
+      "post": {
+        "tags": ["onboarding"], "summary": "Paso 3b: verifica el codigo",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PhoneCodeRequest" } } } },
+        "responses": { "200": { "description": "Celular verificado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Onboarding" } } } }, "400": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/onboarding/activate": {
+      "post": {
+        "tags": ["onboarding"], "summary": "Paso 4: activa la wallet",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActivateRequest" } } } },
+        "responses": { "200": { "description": "Wallet activa", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Onboarding" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["auth"], "summary": "Inicia sesion",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": { "200": { "description": "Sesion iniciada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/auth/me": {
+      "get": { "tags": ["auth"], "summary": "Usuario de la sesion actual", "responses": { "200": { "description": "Sesion", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/auth/logout": {
+      "post": { "tags": ["auth"], "summary": "Cierra la sesion", "responses": { "204": { "description": "Sesion cerrada" } } }
+    },
+    "/api/contacts": {
+      "get": { "tags": ["contacts"], "summary": "Contactos a quienes se puede pagar", "responses": { "200": { "description": "Contactos", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Contact" } } } } }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/wallet": {
+      "get": { "tags": ["wallet"], "summary": "Saldo de la wallet", "responses": { "200": { "description": "Saldo", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Wallet" } } } }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/payments/intents": {
+      "post": {
+        "tags": ["payments"], "summary": "Crea el intento de pago (pantalla de revision)",
+        "description": "Devuelve el destino verificado, el monto y la clave de idempotencia derivada de pagador, monto, destino y ventana del intento. No mueve fondos.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IntentRequest" } } } },
+        "responses": { "201": { "description": "Intento creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Intent" } } } }, "400": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/payments": {
+      "post": {
+        "tags": ["payments"], "summary": "Confirma el pago con la clave de idempotencia del intento",
+        "description": "Un unico resultado terminal por intento (SUCCESS, FAILED o EXPIRED). Repetir la solicitud con la misma clave devuelve el resultado original con el encabezado Idempotent-Replay: true y no mueve fondos. HTTP 200 no implica exito: leer status.",
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmRequest" } } } },
+        "responses": {
+          "200": { "description": "Resultado terminal", "headers": { "Idempotent-Replay": { "schema": { "type": "string", "enum": ["true"] }, "description": "Presente si es una repeticion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payment" } } } },
+          "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "get": {
+        "tags": ["payments"], "summary": "Historial del pagador (enviados y recibidos exitosos)",
+        "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }, { "name": "size", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }],
+        "responses": { "200": { "description": "Movimientos", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Movement" } } } } } }
+      }
+    },
+    "/api/payments/intents/{intentId}/result": {
+      "get": {
+        "tags": ["payments"], "summary": "Resultado original de un intento tras un timeout",
+        "parameters": [{ "name": "intentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Resultado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payment" } } } }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/payments/attempts": {
+      "get": {
+        "tags": ["payments"], "summary": "Intentos del pagador: original o duplicado, con ids de solicitud y correlacion",
+        "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }, { "name": "size", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }],
+        "responses": { "200": { "description": "Intentos", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Attempt" } } } } } }
+      }
+    },
+    "/api/payments/{paymentId}": {
+      "get": {
+        "tags": ["payments"], "summary": "Detalle de un pago propio (pagador, o destinatario si fue exitoso)",
+        "parameters": [{ "name": "paymentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Pago", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payment" } } } }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Error": { "description": "Error con codigo estable y mensaje seguro", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object", "required": ["status", "code", "message"],
+        "properties": {
+          "status": { "type": "integer" },
+          "code": { "type": "string", "description": "VALIDATION_ERROR, UNAUTHENTICATED, INVALID_CREDENTIALS, REGISTRATION_REJECTED, STEP_OUT_OF_ORDER, WALLET_NOT_ACTIVE, DESTINATION_NOT_CONTACT, AMOUNT_ABOVE_LIMIT, IDEMPOTENCY_KEY_MISMATCH, INTENT_NOT_FOUND, NO_RESULT_YET, PAYMENT_NOT_FOUND, entre otros" },
+          "message": { "type": "string" },
+          "fieldErrors": { "type": "array", "items": { "type": "object", "required": ["field", "message"], "properties": { "field": { "type": "string" }, "message": { "type": "string" } } } },
+          "requestId": { "type": "string" }
+        }
+      },
+      "RegisterRequest": { "type": "object", "required": ["email", "password"], "additionalProperties": false, "properties": { "email": { "type": "string", "format": "email", "maxLength": 254 }, "password": { "type": "string", "minLength": 10, "maxLength": 128 } } },
+      "PersonalDataRequest": { "type": "object", "required": ["fullName", "documentNumber"], "additionalProperties": false, "properties": { "fullName": { "type": "string", "minLength": 2, "maxLength": 120 }, "documentNumber": { "type": "string", "pattern": "^[0-9]{8}$", "description": "DNI de 8 digitos, siempre texto" } } },
+      "PhoneRequest": { "type": "object", "required": ["phone"], "additionalProperties": false, "properties": { "phone": { "type": "string", "pattern": "^9[0-9]{8}$" } } },
+      "PhoneCodeRequest": { "type": "object", "required": ["code"], "additionalProperties": false, "properties": { "code": { "type": "string", "pattern": "^[0-9]{6}$" } } },
+      "PhoneCode": { "type": "object", "required": ["expiresAt"], "properties": { "expiresAt": { "type": "string", "format": "date-time" }, "demoCode": { "type": "string", "description": "Solo en modo demo" } } },
+      "ActivateRequest": { "type": "object", "required": ["acceptTerms"], "additionalProperties": false, "properties": { "acceptTerms": { "type": "boolean", "const": true } } },
+      "LoginRequest": { "type": "object", "required": ["email", "password"], "additionalProperties": false, "properties": { "email": { "type": "string" }, "password": { "type": "string" } } },
+      "Session": { "type": "object", "required": ["userId", "email", "status", "completedSteps"], "properties": { "userId": { "type": "string", "format": "uuid" }, "email": { "type": "string" }, "fullName": { "type": "string" }, "status": { "type": "string", "enum": ["ONBOARDING", "ACTIVE"] }, "completedSteps": { "type": "integer" } } },
+      "Step": { "type": "object", "required": ["number", "title", "state"], "properties": { "number": { "type": "integer" }, "title": { "type": "string" }, "state": { "type": "string", "enum": ["DONE", "CURRENT", "PENDING"] } } },
+      "Onboarding": { "type": "object", "required": ["status", "completedSteps", "currentStep", "totalSteps", "steps"], "properties": { "status": { "type": "string", "enum": ["ONBOARDING", "ACTIVE"] }, "completedSteps": { "type": "integer" }, "currentStep": { "type": "integer" }, "totalSteps": { "type": "integer", "const": 4 }, "steps": { "type": "array", "items": { "$ref": "#/components/schemas/Step" } }, "fullName": { "type": "string" }, "phoneMasked": { "type": "string" } } },
+      "Contact": { "type": "object", "required": ["id", "displayName", "phoneMasked"], "properties": { "id": { "type": "string", "format": "uuid" }, "displayName": { "type": "string" }, "phoneMasked": { "type": "string" } } },
+      "Wallet": { "type": "object", "required": ["balance", "currency"], "properties": { "balance": { "type": "string", "pattern": "^-?[0-9]+\\.[0-9]{2}$" }, "currency": { "type": "string", "const": "PEN" } } },
+      "IntentRequest": { "type": "object", "required": ["contactId", "amount"], "additionalProperties": false, "properties": { "contactId": { "type": "string", "format": "uuid" }, "amount": { "type": "string", "description": "Decimal exacto en PEN con maximo 2 decimales", "examples": ["20.00"] } } },
+      "Intent": { "type": "object", "required": ["intentId", "destination", "amount", "currency", "fee", "expiresAt", "idempotencyKey"], "properties": { "intentId": { "type": "string", "format": "uuid" }, "destination": { "type": "object", "required": ["contactId", "displayName", "phoneMasked", "verified"], "properties": { "contactId": { "type": "string", "format": "uuid" }, "displayName": { "type": "string" }, "phoneMasked": { "type": "string" }, "verified": { "type": "boolean" } } }, "amount": { "type": "string" }, "currency": { "type": "string" }, "fee": { "type": "string" }, "expiresAt": { "type": "string", "format": "date-time" }, "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
+      "ConfirmRequest": { "type": "object", "required": ["intentId"], "additionalProperties": false, "properties": { "intentId": { "type": "string", "format": "uuid" } } },
+      "Payment": { "type": "object", "required": ["paymentId", "reference", "status", "amount", "currency", "destinationName", "createdAt"], "properties": { "paymentId": { "type": "string", "format": "uuid" }, "reference": { "type": "string", "pattern": "^TX-[0-9A-F]{4}-[0-9A-F]{4}$" }, "status": { "type": "string", "enum": ["SUCCESS", "FAILED", "EXPIRED"] }, "failureCode": { "type": "string", "enum": ["INTENT_EXPIRED", "INSUFFICIENT_FUNDS", "DESTINATION_UNAVAILABLE"] }, "message": { "type": "string" }, "amount": { "type": "string" }, "currency": { "type": "string" }, "destinationName": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "Movement": { "type": "object", "required": ["paymentId", "reference", "direction", "counterpartName", "amount", "currency", "status", "createdAt"], "properties": { "paymentId": { "type": "string", "format": "uuid" }, "reference": { "type": "string" }, "direction": { "type": "string", "enum": ["SENT", "RECEIVED"] }, "counterpartName": { "type": "string" }, "amount": { "type": "string" }, "currency": { "type": "string" }, "status": { "type": "string", "enum": ["SUCCESS", "FAILED", "EXPIRED"] }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "Attempt": { "type": "object", "required": ["attemptId", "paymentId", "reference", "kind", "outcome", "requestId", "correlationId", "createdAt"], "properties": { "attemptId": { "type": "string", "format": "uuid" }, "paymentId": { "type": "string", "format": "uuid" }, "reference": { "type": "string" }, "kind": { "type": "string", "enum": ["ORIGINAL", "DUPLICATE"] }, "outcome": { "type": "string", "enum": ["SUCCESS", "FAILED", "EXPIRED"] }, "requestId": { "type": "string" }, "correlationId": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } }
+    }
+  }
+}

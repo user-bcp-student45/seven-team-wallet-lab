@@ -1,8 +1,26 @@
 # Orquestacion de infraestructura local
 
-Este directorio se reserva para Compose del laboratorio: contenedores OCI
-compatibles con Docker y Podman Desktop. Los servicios de producto siguen
-pendientes. El runner tiene [Compose ejecutable](../agents/runner/compose.yaml)
+## MVP demo (Kipu)
+
+[compose.yaml](compose.yaml) levanta PostgreSQL, backend Spring Boot y frontend Angular
+(nginx, mismo origen) para HU-01, HU-02 y HU-04. Meilisearch y observabilidad siguen
+pendientes (ver servicios previstos).
+
+```powershell
+Copy-Item .env.example .env   # completar WALLET_DB_PASSWORD y WALLET_DEMO_PASSWORD (datos ficticios)
+podman compose up -d --build  # o: docker compose up -d --build
+# Web: http://127.0.0.1:8081   Parar: podman compose down   (con -v borra los datos)
+```
+
+Usuarios demo sembrados (clave = `WALLET_DEMO_PASSWORD`): `maria.fernandez@demo.kipu.example`
+(pagador, saldo S/ 200.00), y los contactos `carlos.quispe@`, `ana.torres@` y
+`luis.mendoza@` con el mismo dominio. Un usuario nuevo recibe S/ 100.00 ficticios al activarse.
+Solo en demo, el codigo de verificacion del celular se muestra en pantalla (no hay SMS).
+La cookie de sesion no es `Secure` en HTTP local; falta el perfil HTTPS.
+
+## Estado del resto
+
+Los demas servicios siguen pendientes. El runner tiene [Compose ejecutable](../agents/runner/compose.yaml)
 separado y un [controlador externo](Invoke-WalletFlow.ps1) para Windows/Podman.
 Ver [operacion, gates y limites](../agents/runner/README.md). Los agentes nunca
 reciben el socket del motor; el operador ejecuta los checks aprobados sin red,

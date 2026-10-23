@@ -1,7 +1,24 @@
-# Frontend previsto
+# Frontend
 
-Todavia no hay workspace Angular ni package.json. Se preve Angular/TypeScript
-strict, web responsive para el pagador. Secuencia activa: HU-01 -> HU-02 -> HU-04.
+MVP demo implementado: Angular 22 (standalone, signals, Reactive Forms, TypeScript strict),
+responsive y con la marca/pantallas del PDF de la Billetera Kipu: onboarding de 4 pasos,
+Pagar (contacto y monto), revision con destino verificado, resultado exitoso o no realizado
+y historial. Consume solo el BFF por el mismo origen (cookie de sesion HttpOnly, XSRF);
+no guarda datos en el navegador. El escaneo QR, Enviar y Cobrar quedan como pestanas
+deshabilitadas (HU-03 diferida).
+
+```powershell
+npm ci ; npm start     # proxy a http://localhost:8080 (proxy.conf.json)
+npm test -- --watch=false ; npm run build
+```
+
+En el reintento tras un corte de red se conserva la clave de idempotencia del intento y se
+consulta el resultado original; un reintento tras un resultado no exitoso crea un intento nuevo.
+Las pruebas Playwright y la verificacion de accesibilidad WCAG siguen pendientes.
+
+Notas previas de diseno:
+
+Secuencia activa: HU-01 -> HU-02 -> HU-04.
 Comercio, soporte/disputas y conciliacion operativa quedan diferidos. No se
 requiere app nativa en esta fase. Build Node/Angular y servidor web se ejecutaran
 en contenedores OCI/Compose compatibles con Docker y Podman Desktop, sin Node host.

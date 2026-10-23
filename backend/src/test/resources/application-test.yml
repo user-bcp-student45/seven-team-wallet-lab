@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: ${WALLET_TEST_DB_URL:jdbc:postgresql://localhost:5432/wallet_test}
+    username: ${WALLET_DB_USER:wallet}
+    password: ${WALLET_DB_PASSWORD}
+
+wallet:
+  onboarding:
+    expose-demo-phone-code: true
+  payment:
+    intent-ttl: PT60S

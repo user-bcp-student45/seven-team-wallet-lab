@@ -1,0 +1,256 @@
+SEVEN TEAM WALLET LAB
+Documento de apoyo para la presentacion
+Fecha: 23 de octubre de 2026
+
+================================================================
+1. QUE ES EL PROYECTO
+================================================================
+
+Caso de estudio de una wallet (billetera digital) para Peru. Usa dinero
+ficticio e identidades sinteticas. No hay proveedores externos ni simulados:
+los pagos son transferencias internas entre contactos de la wallet.
+
+Alcance activo, en esta secuencia:
+  - HU-01  Onboarding del usuario
+  - HU-02  Pago a un contacto (confirmacion de pago de bajo valor)
+  - HU-04  Proteccion de idempotencia en pagos
+
+Fuera del alcance activo (diferidas, sus fuentes se conservan intactas):
+  - HU-03  Comercios y pagos QR
+  - HU-05  Fallos y reversiones de pago
+  - HU-06  Conciliacion operativa
+
+Regla de dependencia: HU-02 exige incluir HU-01 y HU-04. No se habilitan
+pagos sin proteccion de idempotencia.
+
+================================================================
+2. ESTADO ACTUAL (HONESTO)
+================================================================
+
+Lo que existe:
+  - Requisitos originales: una epica y seis historias de usuario.
+  - Arquitectura objetivo: ADR (propuestos) y diagramas C4.
+  - Cambios OpenSpec para definir el MVP y la orquestacion.
+  - Runner CrewAI ejecutable en contenedores, con gates humanos G0-G3.
+  - Perfiles de agentes y 8 skills reutilizables.
+
+Lo que NO existe todavia:
+  - Las aplicaciones de la wallet (backend Java y frontend Angular).
+  - El Compose de producto y la observabilidad.
+  - Ninguna ejecucion real con modelos de lenguaje.
+
+Las pruebas actuales del runner son offline (con dobles). Verifican el
+funcionamiento del flujo, no el comportamiento financiero de la wallet.
+
+================================================================
+3. ESTRATEGIA DE CONSTRUCCION CON AGENTES
+================================================================
+
+Idea central: la wallet NO se construye con un agente que "lo hace todo".
+
+  - Un runner determinista en Python controla el flujo y los permisos.
+  - Los agentes de IA solo producen texto estructurado (archivos completos
+    en JSON).
+  - El runner valida ese texto antes de escribirlo en disco.
+  - Los agentes no tienen shell, herramientas, secretos ni delegacion libre.
+  - Las historias de usuario y las salidas de otros agentes son DATOS,
+    no instrucciones.
+  - Las pruebas las ejecuta el operador en contenedores aislados, nunca
+    el agente.
+
+Piezas:
+  - Agentes principales: PO, Arquitecto, Security, Testing, AI Engineering.
+  - Agentes de apoyo: Ledger, Backend, Frontend, Plataforma (los coordina
+    el runner).
+  - Skills (8): requisitos, arquitectura, ledger e idempotencia, seguridad,
+    Java, Angular, Podman y observabilidad, testing.
+  - Tareas: 8 de definicion y 8 de construccion.
+  - Framework: CrewAI (Flow y Crews nativos).
+
+================================================================
+4. EL FLUJO, PASO A PASO
+================================================================
+
+FASE 1. ENTRADA Y CONFIGURACION
+  1. El runner descubre las historias de usuario en
+     docs/requirements/user-stories.
+  2. El operador elige sobre cuales trabajar.
+  3. Se define la politica: modelo, limites y checks fijados por digest.
+  4. GATE G0: un humano revisa configuracion y perfiles.
+
+FASE 2. DEFINICION (por cada HU)
+  1. PO: propuesta y especificaciones por criterio de aceptacion.
+  2. GATE G1: un humano aprueba los requisitos.
+  3. Arquitecto: diseno, C4 (niveles 1 a 3) y contrato OpenAPI 3.1.
+  4. Apoyo Ledger: invariantes financieras e idempotencia.
+  5. Security: amenazas y controles.
+  6. Testing: estrategia y plan de pruebas.
+  7. AI Engineering: tareas tecnicas por responsable.
+  8. Testing: verificabilidad del plan.
+  9. PO: revision de alcance.
+ 10. GATE G2: un humano aprueba diseno y tareas, y da permiso de construir.
+ 11. Check externo de OpenSpec en contenedor sin red.
+
+FASE 3. CONSTRUCCION (una HU a la vez: HU-01, HU-04, HU-02)
+  1. Backend (Java 21, Spring Boot, ledger).
+  2. Frontend (Angular).
+  3. Plataforma (Compose, OpenTelemetry, Meilisearch).
+  4. AI Engineering: integracion.
+  5. Checks externos de producto: pruebas en contenedor aislado.
+  6. Revision independiente: Arquitecto, Security, Testing y PO.
+  7. GATE G3: un humano acepta la HU.
+
+  Si fallan los checks o la revision pide cambios, se consume una
+  correccion acotada y se repite el ciclo. Si se agota el limite, el flujo
+  se detiene y escala al humano.
+
+FASE 4. ENTREGA
+  - El candidato queda en agents/runs/<run>/delivery.
+  - Un humano lo aplica y versiona.
+  - No hay commit ni despliegue automatico.
+
+================================================================
+5. QUE HACE CADA GATE
+================================================================
+
+Cada gate es una aprobacion humana ligada a una revision exacta (hash
+SHA-256), firmada por el operador con Ed25519 fuera del alcance de los
+agentes.
+
+  G0  Autoriza el arranque: configuracion, politica y perfiles.
+  G1  Aprueba los requisitos (propuesta y especificaciones).
+  G2  Aprueba diseno y tareas, y autoriza la construccion.
+  G3  Acepta el resultado de cada HU construida.
+
+================================================================
+6. ARQUITECTURA OBJETIVO DE LA WALLET
+================================================================
+
+Estado: arquitectura objetivo, aun no construida.
+
+Recorrido de una peticion:
+  Navegador -> Angular (responsive)
+            -> BFF / API Spring Boot (Java 21, monolito modular)
+            -> PostgreSQL (fuente financiera)
+  Spring Boot -> Meilisearch (busqueda, proyeccion eventual)
+  PostgreSQL -> outbox -> workers -> Meilisearch y analitica
+  Spring Boot -> OpenTelemetry Collector
+                 (Prometheus, Tempo, Loki, Grafana)
+
+Modulos del backend (Clean Architecture y CQRS):
+  - identity-onboarding: usuarios, claves hasheadas, sesiones, contactos.
+  - wallet-ledger: libro contable.
+  - payments: pagos entre contactos.
+  - movement-search: busqueda de movimientos.
+  - analytics: analitica.
+  El dominio no depende de Spring, JPA ni adaptadores.
+
+Decisiones clave:
+  - Monolito modular. No hay microservicios, event sourcing ni broker.
+  - PostgreSQL es la unica fuente financiera.
+  - Meilisearch es solo una proyeccion para buscar. No guarda saldos ni
+    decide autorizacion ni idempotencia.
+  - Identidad propia: tabla de usuarios con claves hasheadas (Argon2id o
+    equivalente) y sesion en servidor. Sin Keycloak ni otro IdP.
+  - Sin proveedores de pago ni KYC, reales o simulados. Sin WireMock.
+
+================================================================
+7. COMO SE PROTEGE EL DINERO
+================================================================
+
+  - Ledger de doble partida: cada pago genera un debito y un credito.
+  - Asientos inmutables.
+  - Importes decimales exactos con moneda explicita. Nunca float ni double.
+  - Un pago es UNA sola transaccion ACID que incluye:
+      debito, credito, clave de idempotencia y registro en outbox.
+  - Si el cliente pierde la respuesta, NO se asume que fallo: reintenta
+    con la misma clave de idempotencia y recibe el resultado original.
+  - Se prueban concurrencia, duplicados, reintentos con la misma clave y
+    consistencia del ledger.
+
+================================================================
+8. SEGURIDAD Y PRIVACIDAD
+================================================================
+
+  - Autorizacion por objeto en el servidor (cada usuario solo ve lo suyo).
+  - Minimo privilegio.
+  - Sesion de servidor; sin tokens persistidos en el navegador.
+  - Claves solo como hash; nunca en claro.
+  - Secretos fuera de Git.
+  - Sin datos personales ni tokens en la telemetria.
+  - Dinero ficticio e identidades sinteticas.
+  - No se afirma certificacion bancaria, PCI DSS ni conformidad
+    regulatoria por adoptar este stack.
+
+================================================================
+9. ENTORNO DE EJECUCION
+================================================================
+
+  - Todo corre en contenedores OCI con Compose compatible con Docker y
+    Podman Desktop.
+  - No se exige instalar Java, Node ni Python en el equipo para el
+    producto.
+  - Hoy solo se levanta el runner de agentes:
+      ./orchestration/Invoke-WalletFlow.ps1 -Action Init
+      ./orchestration/Invoke-WalletFlow.ps1 -Action Start -RunId demo
+  - Excepcion opcional: el runner puede correr en un venv del host para
+    usar la sesion de GitHub Copilot (-HostRunner). Pierde el aislamiento
+    del contenedor y requiere cerrar antes la decision Q-15.
+
+================================================================
+10. REGLAS DE TRABAJO
+================================================================
+
+  - Los originales de la epica y las seis HU no se modifican ni se
+    sustituyen por resumenes.
+  - Los cambios se definen con OpenSpec antes de construir.
+  - Cada tarea enlaza HU, criterios, escenarios verificables y evidencia.
+  - No se marca una tarea como completa solo porque un agente produjo
+    texto.
+  - Commits con Conventional Commits en espanol, solo con autorizacion
+    explicita.
+  - No se activan crews ni se consumen APIs de modelos sin autorizacion.
+
+================================================================
+11. PENDIENTES Y RIESGOS
+================================================================
+
+Bloqueos para pasar G0 (segun la revision de configuracion):
+  - Los perfiles de PO, Testing y Security estan en estado draft; el
+    runner exige configured o reviewed.
+  - Falta una politica real (modelo, limites, checks por digest).
+  - Q-15 debe cerrarse antes de usar el proveedor Copilot SDK.
+
+Limites conocidos del runner:
+  - No hay tope monetario duro de gasto en modelos.
+  - Compose no filtra el egress de red; requiere control externo.
+  - Faltan lock de dependencias transitivas, SBOM y digest de la imagen
+    base del runner.
+  - Las imagenes de checks (Maven, npm, OpenSpec) no estan validadas.
+
+Por construir:
+  - Esqueletos de backend (Java 21) y frontend (Angular).
+  - Compose con PostgreSQL, Meilisearch, backend y frontend.
+  - Perfil de observabilidad.
+  - Datos sinteticos, migraciones Flyway y reindexado.
+  - HTTPS local para el BFF.
+  - Versiones fijadas (Q-16) y checks reales (JUnit, Testcontainers,
+    Playwright).
+
+================================================================
+12. GUIA RAPIDA PARA PRESENTAR (SUGERENCIA DE DIAPOSITIVAS)
+================================================================
+
+  1. Que es y para que sirve (seccion 1)
+  2. Donde estamos hoy (seccion 2)
+  3. Idea clave: runner determinista + agentes acotados (seccion 3)
+  4. Flujo de extremo a extremo (seccion 4)
+  5. Los cuatro gates humanos (seccion 5)
+  6. Arquitectura de la wallet (seccion 6)
+  7. Integridad financiera e idempotencia (seccion 7)
+  8. Seguridad y privacidad (seccion 8)
+  9. Pendientes y proximos pasos (seccion 11)
+
+Mensaje final sugerido: el valor del proyecto esta en el control del
+proceso (gates, firmas, aislamiento y trazabilidad), no en delegar la
+construccion a un agente sin supervision.

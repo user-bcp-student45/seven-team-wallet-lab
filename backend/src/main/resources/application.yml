@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: wallet-backend
+  datasource:
+    url: ${WALLET_DB_URL:jdbc:postgresql://localhost:5432/wallet}
+    username: ${WALLET_DB_USER:wallet}
+    password: ${WALLET_DB_PASSWORD:}
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: true
+  mvc:
+    problemdetails:
+      enabled: false
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${WALLET_COOKIE_SECURE:false}
+        name: KIPU_SESSION
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+
+# Supuestos de MVP pendientes de decision de producto (Q-04, Q-05, Q-07, Q-10, Q-11).
+wallet:
+  payment:
+    currency: PEN
+    max-amount: ${WALLET_PAYMENT_MAX_AMOUNT:500.00}
+    intent-ttl: ${WALLET_PAYMENT_INTENT_TTL:PT60S}
+  onboarding:
+    initial-balance: ${WALLET_INITIAL_BALANCE:100.00}
+    phone-code-ttl: PT10M
+    phone-code-max-attempts: 5
+    # Sin proveedor SMS: solo en demo el codigo se devuelve en la respuesta.
+    expose-demo-phone-code: ${WALLET_EXPOSE_DEMO_PHONE_CODE:false}
+  security:
+    max-failed-logins: 5
+    lockout: PT15M
+  demo:
+    seed-enabled: ${WALLET_DEMO_SEED:false}
+    password: ${WALLET_DEMO_PASSWORD:}

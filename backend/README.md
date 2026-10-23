@@ -1,7 +1,22 @@
-# Backend previsto
+# Backend
 
-Todavia no existe aplicacion ni build Maven. Java 21 y Spring Boot con monolito
-modular, CQRS PostgreSQL/Meilisearch y Clean Architecture. Alcance y secuencia:
+MVP demo implementado: Java 21, Spring Boot 3.5 (MVC imperativo), Maven, PostgreSQL y Flyway.
+Contrato OpenAPI propio en [swagger.json](swagger.json). Cubre HU-01 (onboarding de 4 pasos),
+HU-02 (intento, revision y confirmacion de pago entre contactos) y HU-04 (idempotencia).
+Meilisearch, workers del outbox, OTel y conciliacion diaria siguen pendientes.
+
+```powershell
+# Pruebas (21) contra PostgreSQL real; la base wallet_test la crea orchestration/postgres/init
+$env:WALLET_DB_PASSWORD = '<clave de orchestration/.env>'
+mvn test
+```
+
+Supuestos de MVP configurables en [application.yml](src/main/resources/application.yml) y
+pendientes de decision: monto maximo S/ 500.00 (Q-04), expiracion del intento 60 s (Q-05),
+retencion de claves sin definir (Q-07), fondeo ficticio inicial de S/ 100.00 (Q-10) y bloqueo
+tras 5 intentos fallidos (Q-11). Los contactos de un usuario activado son los usuarios demo.
+
+Limites arquitectonicos previstos (arquitectura objetivo). Alcance y secuencia:
 HU-01 onboarding -> HU-02 confirmacion de pago -> HU-04 idempotencia. Ver
 [stack y ADR](../architecture/README.md).
 
